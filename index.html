@@ -7,16 +7,35 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>MMSerim Agent Lab</h1>
-    <div class="app-card">
-        <div id="counter-container">
-            <p id="counter">0</p>
-            <button id="incrementButton">Increment</button>
-            <button id="resetButton">Reset</button>
+    <div class="top-bar">
+        <div class="branding">
+            <h1>MMSerim CodeSpace</h1>
         </div>
     </div>
-    <button id="statusButton">Toggle Status</button>
-    <p id="statusMessage">Status: Ready</p>
+    <div class="main-container">
+        <aside class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="#">Dashboard</a></li>
+                    <li><a href="#">Settings</a></li>
+                    <li><a href="#">Help</a></li>
+                </ul>
+            </nav>
+        </aside>
+        <main class="main-content">
+            <div class="app-card">
+                <div id="counter-container">
+                    <p id="counter">0</p>
+                    <button id="incrementButton">Increment</button>
+                    <button id="resetButton">Reset</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <footer class="status-bar">
+        <button id="statusButton">Toggle Status</button>
+        <p id="statusMessage">Status: Ready</p>
+    </footer>
     <script src="script.js"></script>
 </body>
 </html>
