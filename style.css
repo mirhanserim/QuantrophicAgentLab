@@ -41,3 +41,40 @@ button:hover {
     margin-top: 10px;
     font-size: 14px;
 }
+.editor-tabs {
+    margin-bottom: 10px;
+}
+.tab-button {
+    margin-right: 5px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+.tab-button.selected {
+    background-color: #555;
+}
+.code-editor {
+    position: relative;
+    border: 1px solid #444;
+    background-color: #1e1e1e;
+    overflow: auto;
+}
+.line-numbers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 100%;
+    color: #666;
+    font-family: monospace;
+}
+.content {
+    padding: 10px;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    outline: none;
+}

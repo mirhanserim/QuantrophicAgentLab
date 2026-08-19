@@ -23,7 +23,14 @@
             </div>
         </aside>
         <main class="main-content">
-            <div class="app-card">
+            <div class="app-card"><div class="editor-tabs">
+  <button class="tab-button selected" data-file="main.js">main.js</button>
+  <button class="tab-button" data-file="utils.js">utils.js</button>
+</div>
+<div class="code-editor">
+  <div class="line-numbers"></div>
+  <div class="editor-content" contenteditable="true"></div>
+</div>
                 <div id="counter-container">
                     <p id="counter">0</p>
                     <button id="incrementButton">Increment</button>
@@ -38,4 +45,4 @@
     </footer>
     <script src="script.js"></script>
 </body>
-</html>
+</html><div class="active-file" style="margin-left: 10px; font-weight: bold;"></div>
