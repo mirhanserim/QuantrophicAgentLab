@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMSerim Agent Lab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="top-bar">
+        <div class="branding">
+            <h1>MMSerim CodeSpace</h1>
+        </div>
+    </div>
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="file-explorer">
+                <h2>File Explorer</h2>
+                <div class="file-item" data-file="project">project</div>
+                <div class="file-item" data-file="index.html">index.html</div>
+                <div class="file-item" data-file="style.css">style.css</div>
+                <div class="file-item" data-file="script.js">script.js</div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="app-card"><div class="editor-tabs">
+  <button class="tab-button selected" data-file="index.html">index.html</button>
+  <button class="tab-button" data-file="style.css">style.css</button>
+  <button class="tab-button" data-file="script.js">script.js</button>
+</div>
+<div class="code-editor">
+  <div class="line-numbers"><div class="line-number">1</div><div class="line-number">2</div><div class="line-number">3</div></div><div class="preview-panel">
+  <div class="preview-header">Preview</div>
+  <div class="preview-controls">Controls</div>
+  <div class="preview-content">Content</div>
+</div>
+  <div class="editor-content" contenteditable="true">// Sample code<br>console.log("Hello, MMSerim!");</div>
+  <div class="active-file">index.html</div>
+</div>
+                <div id="counter-container">
+                    <p id="counter">0</p>
+                    <button id="incrementButton">Increment</button>
+                    <button id="resetButton">Reset</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <footer class="status-bar">
+        <button id="statusButton">Toggle Status</button>
+        <p id="statusMessage">Status: Ready</p>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>

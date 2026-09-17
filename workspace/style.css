@@ -1,0 +1,80 @@
+body {
+    background-color: #121212;
+    color: #e0e0e0;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 20px;
+}
+
+.app-card {
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 20px;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#counter {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;
+    margin: 10px 0;
+}
+
+button {
+    margin: 5px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+    cursor: pointer;
+    background-color: #4a4a4a;
+    border: none;
+}
+
+button:hover {
+    background-color: #5a5a5a;
+}
+
+#statusMessage {
+    margin-top: 10px;
+    font-size: 14px;
+}
+.editor-tabs {
+    margin-bottom: 10px;
+}
+.tab-button {
+    margin-right: 5px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+.tab-button.selected {
+    background-color: #555;
+}
+.code-editor {
+    position: relative;
+    border: 1px solid #444;
+    background-color: #1e1e1e;
+    overflow: auto;
+}
+.line-numbers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 100%;
+    color: #666;
+    font-family: monospace;
+}
+.content {
+    padding: 10px;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    outline: none;
+}
