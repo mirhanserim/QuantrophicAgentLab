@@ -1,0 +1,6 @@
+agent/.venv/
+agent/__pycache__/
+**/__pycache__/
+*.pyc
+agent/_to_delete/
+.DS_Store
