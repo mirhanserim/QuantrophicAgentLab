@@ -1,21 +1,28 @@
-from pathlib import Path
+"""Chromium verifier driven by declarative checks from a milestone file.
+
+Each check has a stable ``id`` so the agent loop can tell exactly which
+previously-passing behaviour a patch broke (not just whether the total
+failure count went up).
+
+Supported check types (see milestones/*.json):
+  visible        selector is present and visible
+  text_any       selector's text contains any of ``any``
+  css_in         computed ``property`` of selector is one of ``values``
+  click_class    clicking ``click`` gives it ``class``
+  click_changes  clicking ``click`` changes the text of ``watch``
+  click_text     clicking ``click`` makes ``watch`` contain ``contains``
+  min_numbers    selector's text holds at least ``min`` numbers
+"""
+
 from functools import partial
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from threading import Thread
 import re
-import time
 
 from playwright.sync_api import sync_playwright
 
-
-ROOT = Path.home() / "MMSerimAgentLab"
-WORKSPACE = (ROOT / "workspace").resolve()
-ARTIFACTS = (ROOT / "agent" / "artifacts").resolve()
-ARTIFACTS.mkdir(parents=True, exist_ok=True)
-
-# Update this per milestone (kept alongside agent.py's
-# MILESTONE_NUMBER for easy discovery when copying this file).
-SCREENSHOT_NAME = "milestone5-browser.png"
+from config import ARTIFACTS, WORKSPACE
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -23,438 +30,152 @@ class QuietHandler(SimpleHTTPRequestHandler):
         pass
 
 
-def start_server():
-    handler = partial(
-        QuietHandler,
-        directory=str(WORKSPACE),
-    )
-
-    server = ThreadingHTTPServer(
-        ("127.0.0.1", 0),
-        handler,
-    )
-
-    thread = Thread(
-        target=server.serve_forever,
-        daemon=True,
-    )
-    thread.start()
-
+def start_server(root: Path):
+    handler = partial(QuietHandler, directory=str(root))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    Thread(target=server.serve_forever, daemon=True).start()
     return server, server.server_address[1]
 
 
-def run_browser_verification(save_screenshot=True):
-    results = []
-    console_errors = []
-    page_errors = []
+def _text(page, selector):
+    loc = page.locator(selector)
+    return loc.first.inner_text().strip() if loc.count() else ""
 
-    def check(condition, success, failure):
-        results.append(
-            (
-                bool(condition),
-                success if condition else failure,
-            )
+
+def _visible(page, selector):
+    loc = page.locator(selector)
+    return loc.count() > 0 and loc.first.is_visible()
+
+
+def run_check(page, check):
+    kind = check["type"]
+    sel = check.get("selector")
+
+    if kind == "visible":
+        return _visible(page, sel)
+
+    if kind == "text_any":
+        text = _text(page, sel)
+        return any(token in text for token in check["any"])
+
+    if kind == "css_in":
+        if not page.locator(sel).count():
+            return False
+        value = page.locator(sel).first.evaluate(
+            "(el, p) => getComputedStyle(el).getPropertyValue(p)",
+            check["property"],
+        )
+        return value in check["values"]
+
+    if kind == "min_numbers":
+        return (
+            _visible(page, sel)
+            and len(re.findall(r"\b\d+\b", _text(page, sel))) >= check["min"]
         )
 
-    server, port = start_server()
-    time.sleep(0.2)
+    if kind == "click_class":
+        loc = page.locator(check["click"])
+        if not loc.count():
+            return False
+        loc.first.click()
+        page.wait_for_timeout(120)
+        return loc.first.evaluate(
+            "(el, c) => el.classList.contains(c)", check["class"]
+        )
 
+    if kind in {"click_changes", "click_text"}:
+        loc = page.locator(check["click"])
+        if not loc.count() or not page.locator(check["watch"]).count():
+            return False
+        before = _text(page, check["watch"])
+        loc.first.click()
+        page.wait_for_timeout(120)
+        after = _text(page, check["watch"])
+        if kind == "click_changes":
+            return before != after
+        return before != after and check["contains"] in after
+
+    raise ValueError(f"Unknown check type: {kind}")
+
+
+def run_browser_verification(milestone, save_screenshot=True, workspace=WORKSPACE):
+    """Return {"passed", "failed", "results": {id: bool}, "report": str}."""
+    results = []  # (id, ok, message)
+    console_errors, page_errors = [], []
+    checks = milestone.get("regression_checks", []) + milestone.get("checks", [])
+
+    server, port = start_server(workspace)
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-
             try:
-                page = browser.new_page(
-                    viewport={
-                        "width": 1440,
-                        "height": 900,
-                    }
-                )
-
-                page.on(
-                    "console",
-                    lambda msg: (
-                        console_errors.append(msg.text)
-                        if msg.type == "error"
-                        else None
-                    ),
-                )
-
-                page.on(
-                    "pageerror",
-                    lambda exc: page_errors.append(str(exc)),
-                )
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                page.on("console", lambda m: m.type == "error" and console_errors.append(m.text))
+                page.on("pageerror", lambda e: page_errors.append(str(e)))
 
                 response = page.goto(
-                    f"http://127.0.0.1:{port}/index.html",
+                    f"http://127.0.0.1:{port}/{milestone.get('entry', 'index.html')}",
                     wait_until="networkidle",
                     timeout=15000,
                 )
+                results.append(("page-loads", bool(response and response.ok), "Page loads"))
 
-                check(
-                    response is not None and response.ok,
-                    "Page loads successfully.",
-                    "Page does not load.",
-                )
+                for check in checks:
+                    try:
+                        ok = bool(run_check(page, check))
+                        msg = check["label"]
+                    except Exception as exc:  # a broken page must not crash the run
+                        ok, msg = False, f"{check['label']} (error: {type(exc).__name__}: {exc})"
+                    results.append((check["id"], ok, msg))
 
-                # Base shell
-                check(
-                    page.get_by_text(
-                        "MMSerim CodeSpace",
-                        exact=False,
-                    ).count() > 0,
-                    "MMSerim CodeSpace branding visible.",
-                    "MMSerim CodeSpace branding missing.",
-                )
-
-                check(
-                    page.get_by_text(
-                        "File Explorer",
-                        exact=True,
-                    ).count() > 0,
-                    "File Explorer visible.",
-                    "File Explorer missing.",
-                )
-
-                for filename in [
-                    "index.html",
-                    "style.css",
-                    "script.js",
-                ]:
-                    check(
-                        page.locator(
-                            f'[data-file="{filename}"]'
-                        ).count() > 0,
-                        f"{filename} exists.",
-                        f"{filename} missing.",
-                    )
-
-                script_entry = page.locator(
-                    '.file-item[data-file="script.js"]'
-                )
-
-                if script_entry.count():
-                    script_entry.first.click()
-
-                    selected = script_entry.first.evaluate(
-                        "el => el.classList.contains('selected')"
-                    )
-
-                    check(
-                        selected,
-                        "Explorer selection works.",
-                        "Explorer selection broken.",
-                    )
-
-                # Editor
-                editor = page.locator(".code-editor")
-                tabs = page.locator(".editor-tabs")
-                content = page.locator(".editor-content")
-                active = page.locator(".active-file")
-
-                check(
-                    editor.count() > 0
-                    and editor.first.is_visible(),
-                    "Code editor visible.",
-                    "Code editor missing/hidden.",
-                )
-
-                check(
-                    tabs.count() > 0
-                    and tabs.first.is_visible(),
-                    "Editor tabs visible.",
-                    "Editor tabs missing/hidden.",
-                )
-
-                check(
-                    content.count() > 0
-                    and content.first.is_visible(),
-                    "Editor content visible.",
-                    "Editor content missing/hidden.",
-                )
-
-                content_text = ""
-                if content.count():
-                    content_text = content.first.inner_text().strip()
-
-                check(
-                    bool(content_text),
-                    "Editor contains visible sample code.",
-                    "Editor content empty.",
-                )
-
-                line_numbers = page.locator(".line-numbers")
-                line_text = ""
-
-                if line_numbers.count():
-                    line_text = line_numbers.first.inner_text().strip()
-
-                numbers = re.findall(r"\b\d+\b", line_text)
-
-                check(
-                    line_numbers.count() > 0
-                    and line_numbers.first.is_visible()
-                    and len(numbers) >= 3,
-                    "Visible line numbers contain numbers.",
-                    "Line numbers missing/empty.",
-                )
-
-                active_text = ""
-
-                if active.count():
-                    active_text = active.first.inner_text().strip()
-
-                check(
-                    active.count() > 0
-                    and active.first.is_visible()
-                    and any(
-                        f in active_text
-                        for f in [
-                            "index.html",
-                            "style.css",
-                            "script.js",
-                        ]
-                    ),
-                    "Active file indicator works.",
-                    "Active file indicator invalid.",
-                )
-
-                style_tab = page.locator(
-                    '.editor-tabs [data-file="style.css"]'
-                )
-
-                if style_tab.count() and active.count():
-                    before = active.first.inner_text()
-
-                    style_tab.first.click()
-                    page.wait_for_timeout(120)
-
-                    after = active.first.inner_text()
-
-                    check(
-                        before != after
-                        and "style.css" in after,
-                        "Editor tab updates active file.",
-                        "Editor tab does not update active file.",
-                    )
-
-                # Status/counter regression
-                status_button = page.locator("#statusButton")
-                status_message = page.locator("#statusMessage")
-
-                if (
-                    status_button.count()
-                    and status_message.count()
-                ):
-                    before = status_message.first.inner_text()
-
-                    status_button.first.click()
-                    page.wait_for_timeout(120)
-
-                    after = status_message.first.inner_text()
-
-                    check(
-                        before != after,
-                        "Status button works.",
-                        "Status button broken.",
-                    )
-
-                increment = page.locator("#incrementButton")
-                counter = page.locator("#counter")
-
-                if increment.count() and counter.count():
-                    before = counter.first.inner_text()
-
-                    increment.first.click()
-                    page.wait_for_timeout(120)
-
-                    after = counter.first.inner_text()
-
-                    check(
-                        before != after,
-                        "Legacy counter works.",
-                        "Legacy counter broken.",
-                    )
-
-                # Preview panel regression
-                preview = page.locator(".preview-panel")
-                preview_header = page.locator(".preview-header")
-                preview_controls = page.locator(".preview-controls")
-                preview_content = page.locator(".preview-content")
-
-                check(
-                    preview.count() > 0
-                    and preview.first.is_visible(),
-                    "Preview panel visible.",
-                    "Preview panel missing/hidden.",
-                )
-
-                check(
-                    preview_header.count() > 0
-                    and preview_header.first.is_visible(),
-                    "Preview header visible.",
-                    "Preview header missing/hidden.",
-                )
-
-                check(
-                    preview_controls.count() > 0
-                    and preview_controls.first.is_visible(),
-                    "Preview controls visible.",
-                    "Preview controls missing/hidden.",
-                )
-
-                check(
-                    preview_content.count() > 0
-                    and preview_content.first.is_visible(),
-                    "Preview content visible.",
-                    "Preview content missing/hidden.",
-                )
-
-                # Milestone 5 Terminal
-                terminal = page.locator(".terminal-panel")
-                terminal_header = page.locator(".terminal-header")
-                terminal_output = page.locator(".terminal-output")
-                terminal_prompt = page.locator(".terminal-prompt")
-
-                check(
-                    terminal.count() > 0
-                    and terminal.first.is_visible(),
-                    "Terminal panel visible.",
-                    "Terminal panel missing/hidden.",
-                )
-
-                check(
-                    terminal_header.count() > 0
-                    and terminal_header.first.is_visible(),
-                    "Terminal header visible.",
-                    "Terminal header missing/hidden.",
-                )
-
-                check(
-                    terminal_output.count() > 0
-                    and terminal_output.first.is_visible(),
-                    "Terminal output visible.",
-                    "Terminal output missing/hidden.",
-                )
-
-                terminal_text = ""
-
-                if terminal_output.count():
-                    terminal_text = (
-                        terminal_output.first
-                        .inner_text()
-                        .strip()
-                    )
-
-                check(
-                    "$" in terminal_text
-                    or ">" in terminal_text,
-                    "Terminal contains command-like output.",
-                    "Terminal lacks command/output text.",
-                )
-
-                check(
-                    terminal_prompt.count() > 0
-                    and terminal_prompt.first.is_visible(),
-                    "Terminal prompt visible.",
-                    "Terminal prompt missing/hidden.",
-                )
-
-                if terminal.count():
-                    overflow_y = terminal.first.evaluate(
-                        """
-                        el => getComputedStyle(el).overflowY
-                        """
-                    )
-
-                    check(
-                        overflow_y in {
-                            "auto",
-                            "scroll",
-                        },
-                        "Terminal is scrollable.",
-                        "Terminal should be vertically scrollable.",
-                    )
-
-                # Health
-                check(
-                    not page_errors,
-                    "No uncaught JavaScript errors.",
-                    (
-                        "JavaScript errors: "
-                        + " | ".join(page_errors)
-                    ),
-                )
-
-                check(
-                    not console_errors,
-                    "No console errors.",
-                    (
-                        "Console errors: "
-                        + " | ".join(console_errors)
-                    ),
-                )
+                results.append((
+                    "no-js-errors", not page_errors,
+                    "No uncaught JavaScript errors" + ("" if not page_errors else ": " + " | ".join(page_errors)),
+                ))
+                results.append((
+                    "no-console-errors", not console_errors,
+                    "No console errors" + ("" if not console_errors else ": " + " | ".join(console_errors)),
+                ))
 
                 if save_screenshot:
+                    ARTIFACTS.mkdir(parents=True, exist_ok=True)
                     page.screenshot(
-                        path=str(
-                            ARTIFACTS
-                            / SCREENSHOT_NAME
-                        ),
+                        path=str(ARTIFACTS / f"{milestone['slug']}-browser.png"),
                         full_page=True,
                     )
             finally:
                 browser.close()
-
     except Exception as exc:
-        results.append(
-            (
-                False,
-                f"Browser verifier crashed: {exc}",
-            )
-        )
-
+        results.append(("verifier", False, f"Browser verifier crashed: {type(exc).__name__}: {exc}"))
     finally:
         server.shutdown()
 
-    passed = sum(
-        1 for ok, _ in results if ok
-    )
-
-    failed = sum(
-        1 for ok, _ in results if not ok
-    )
-
-    report = "\n".join(
-        f"{'PASS' if ok else 'FAIL'}: {message}"
-        for ok, message in results
-    )
-
-    report += (
-        f"\n\nRESULT: "
-        f"{passed} passed / {failed} failed"
-    )
-
+    passed = sum(1 for _, ok, _ in results if ok)
+    failed = len(results) - passed
+    report = "\n".join(f"{'PASS' if ok else 'FAIL'}: {msg}" for _, ok, msg in results)
+    report += f"\n\nRESULT: {passed} passed / {failed} failed"
     return {
         "passed": passed,
         "failed": failed,
+        "results": {cid: ok for cid, ok, _ in results},
         "report": report,
     }
 
 
+def regressions(before, after):
+    """IDs that passed in ``before`` but fail in ``after``."""
+    return sorted(
+        cid for cid, ok in before["results"].items()
+        if ok and not after["results"].get(cid, False)
+    )
+
+
 if __name__ == "__main__":
-    result = run_browser_verification()
+    import sys
+    from config import load_milestone
 
-    print()
-    print("=" * 64)
-    print("MMSerim Milestone 5 Browser Verifier")
-    print("=" * 64)
-    print()
+    ms = load_milestone(sys.argv[1] if len(sys.argv) > 1 else None)
+    result = run_browser_verification(ms)
+    print(f"\n{ms['title']}\n" + "=" * 64 + "\n")
     print(result["report"])
-    print()
-
-    if result["failed"]:
-        print("BROWSER VERIFICATION FAILED")
-        raise SystemExit(1)
-
-    print("BROWSER VERIFICATION PASSED")
+    raise SystemExit(1 if result["failed"] else 0)

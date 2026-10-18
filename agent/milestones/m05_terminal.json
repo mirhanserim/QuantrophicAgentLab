@@ -1,0 +1,71 @@
+{
+  "title": "Milestone 5 — Terminal panel",
+  "goal": "Add a professional terminal panel that looks like part of an IDE.",
+  "requirements": [
+    "terminal-panel",
+    "terminal-header",
+    "terminal-output",
+    "terminal-prompt",
+    "fake developer commands/output",
+    "vertically scrollable terminal area"
+  ],
+  "preserve": [
+    "File Explorer",
+    "Code Editor",
+    "Preview",
+    "editor tabs",
+    "active-file",
+    "line numbers",
+    "status",
+    "counter",
+    "existing JavaScript behavior"
+  ],
+  "commit_message": "Milestone 5: browser-verified terminal panel",
+  "checks": [
+    {
+      "id": "terminal",
+      "type": "visible",
+      "selector": ".terminal-panel",
+      "label": "Terminal panel visible"
+    },
+    {
+      "id": "terminal-header",
+      "type": "visible",
+      "selector": ".terminal-header",
+      "label": "Terminal header visible"
+    },
+    {
+      "id": "terminal-output",
+      "type": "visible",
+      "selector": ".terminal-output",
+      "label": "Terminal output visible"
+    },
+    {
+      "id": "terminal-text",
+      "type": "text_any",
+      "selector": ".terminal-output",
+      "any": [
+        "$",
+        ">"
+      ],
+      "label": "Terminal contains command-like output"
+    },
+    {
+      "id": "terminal-prompt",
+      "type": "visible",
+      "selector": ".terminal-prompt",
+      "label": "Terminal prompt visible"
+    },
+    {
+      "id": "terminal-scroll",
+      "type": "css_in",
+      "selector": ".terminal-panel",
+      "property": "overflow-y",
+      "values": [
+        "auto",
+        "scroll"
+      ],
+      "label": "Terminal is vertically scrollable"
+    }
+  ]
+}

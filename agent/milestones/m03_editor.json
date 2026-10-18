@@ -1,0 +1,73 @@
+{
+  "title": "Milestone 3 — Code editor",
+  "goal": "Editor with tabs, line numbers and active file indicator.",
+  "requirements": [
+    ".code-editor",
+    ".editor-tabs",
+    ".editor-content",
+    ".line-numbers",
+    ".active-file"
+  ],
+  "preserve": [
+    "File Explorer",
+    "counter",
+    "status"
+  ],
+  "checks": [
+    {
+      "id": "editor",
+      "type": "visible",
+      "selector": ".code-editor",
+      "label": "Code editor visible"
+    },
+    {
+      "id": "tabs",
+      "type": "visible",
+      "selector": ".editor-tabs",
+      "label": "Editor tabs visible"
+    },
+    {
+      "id": "editor-content",
+      "type": "visible",
+      "selector": ".editor-content",
+      "label": "Editor content visible"
+    },
+    {
+      "id": "editor-sample",
+      "type": "text_any",
+      "selector": ".editor-content",
+      "any": [
+        "(",
+        ";",
+        "//"
+      ],
+      "label": "Editor contains sample code"
+    },
+    {
+      "id": "line-numbers",
+      "type": "min_numbers",
+      "selector": ".line-numbers",
+      "min": 3,
+      "label": "Line numbers visible"
+    },
+    {
+      "id": "active-file",
+      "type": "text_any",
+      "selector": ".active-file",
+      "any": [
+        "index.html",
+        "style.css",
+        "script.js"
+      ],
+      "label": "Active file indicator works"
+    },
+    {
+      "id": "tab-switch",
+      "type": "click_text",
+      "click": ".editor-tabs [data-file=\"style.css\"]",
+      "watch": ".active-file",
+      "contains": "style.css",
+      "label": "Editor tab updates active file"
+    }
+  ]
+}

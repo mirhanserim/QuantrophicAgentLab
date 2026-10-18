@@ -1,0 +1,23 @@
+{
+  "title": "Milestone 1 — CodeSpace layout",
+  "goal": "IDE-style layout with branding and sidebar.",
+  "requirements": [
+    "Quantrophic CodeSpace branding",
+    "sidebar"
+  ],
+  "preserve": [
+    "counter",
+    "status"
+  ],
+  "checks": [
+    {
+      "id": "branding",
+      "type": "text_any",
+      "selector": ".branding",
+      "any": [
+        "Quantrophic CodeSpace"
+      ],
+      "label": "Quantrophic CodeSpace branding visible"
+    }
+  ]
+}

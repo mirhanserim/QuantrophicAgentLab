@@ -1,0 +1,25 @@
+{
+  "title": "Milestone 0 — Baseline app",
+  "goal": "Counter and status toggle.",
+  "requirements": [
+    "#counter + #incrementButton",
+    "#statusButton toggles #statusMessage"
+  ],
+  "preserve": [],
+  "checks": [
+    {
+      "id": "status-toggle",
+      "type": "click_changes",
+      "click": "#statusButton",
+      "watch": "#statusMessage",
+      "label": "Status button works"
+    },
+    {
+      "id": "counter",
+      "type": "click_changes",
+      "click": "#incrementButton",
+      "watch": "#counter",
+      "label": "Legacy counter works"
+    }
+  ]
+}

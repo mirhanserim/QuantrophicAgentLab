@@ -4,14 +4,13 @@ import shutil
 import tempfile
 
 
-WORKSPACE = (
-    Path.home()
-    / "MMSerimAgentLab"
-    / "workspace"
-).resolve()
+from config import WORKSPACE
 
 
 def safe_path(relative_path: str) -> Path:
+    if not relative_path or not str(relative_path).strip():
+        raise ValueError("path is required.")
+
     target = (WORKSPACE / relative_path).resolve()
 
     if not target.is_relative_to(WORKSPACE):
@@ -19,10 +18,16 @@ def safe_path(relative_path: str) -> Path:
             "ACCESS DENIED: path is outside workspace."
         )
 
+    if ".git" in target.relative_to(WORKSPACE).parts:
+        raise PermissionError(
+            "ACCESS DENIED: .git is off-limits."
+        )
+
     return target
 
 
 def list_files() -> str:
+    """List every file in the workspace (relative paths)."""
     files = []
 
     for path in WORKSPACE.rglob("*"):
@@ -38,6 +43,11 @@ def list_files() -> str:
 
 
 def read_file(path: str) -> str:
+    """Read a workspace file.
+
+    Args:
+        path: file path relative to the workspace, e.g. "index.html"
+    """
     target = safe_path(path)
 
     if not target.exists():
@@ -72,9 +82,30 @@ def write_file(path: str, content: str) -> str:
     return f"Successfully created: {path}"
 
 
-def replace_text(path: str, old: str, new: str) -> str:
+def _load_for_patch(path: str, marker: str, what: str):
+    if not marker:
+        raise ValueError(f"{what} must be non-empty exact file text.")
+
     target = safe_path(path)
-    text = target.read_text(encoding="utf-8")
+
+    if not target.is_file():
+        raise FileNotFoundError(f"File does not exist: {path}")
+
+    return target, target.read_text(encoding="utf-8")
+
+
+def replace_text(path: str, old: str, new: str) -> str:
+    """Replace ONE exact, unique occurrence of text in a file.
+
+    Args:
+        path: file path relative to the workspace
+        old: exact literal text currently in the file (must occur once)
+        new: replacement text
+    """
+    if old == new:
+        return "PATCH REJECTED: old and new are identical."
+
+    target, text = _load_for_patch(path, old, "old")
 
     count = text.count(old)
 
@@ -96,8 +127,17 @@ def replace_text(path: str, old: str, new: str) -> str:
 
 
 def insert_before(path: str, marker: str, content: str) -> str:
-    target = safe_path(path)
-    text = target.read_text(encoding="utf-8")
+    """Insert content before ONE exact, unique marker in a file.
+
+    Args:
+        path: file path relative to the workspace
+        marker: exact literal text currently in the file (not a CSS selector)
+        content: text to insert
+    """
+    if not content:
+        return "PATCH REJECTED: content is empty."
+
+    target, text = _load_for_patch(path, marker, "marker")
 
     count = text.count(marker)
 
@@ -122,8 +162,17 @@ def insert_before(path: str, marker: str, content: str) -> str:
 
 
 def insert_after(path: str, marker: str, content: str) -> str:
-    target = safe_path(path)
-    text = target.read_text(encoding="utf-8")
+    """Insert content after ONE exact, unique marker in a file.
+
+    Args:
+        path: file path relative to the workspace
+        marker: exact literal text currently in the file (not a CSS selector)
+        content: text to insert
+    """
+    if not content:
+        return "PATCH REJECTED: content is empty."
+
+    target, text = _load_for_patch(path, marker, "marker")
 
     count = text.count(marker)
 
@@ -148,7 +197,19 @@ def insert_after(path: str, marker: str, content: str) -> str:
 
 
 def append_text(path: str, content: str) -> str:
+    """Append content to the end of an existing file.
+
+    Args:
+        path: file path relative to the workspace
+        content: text to append
+    """
+    if not content:
+        return "PATCH REJECTED: content is empty."
+
     target = safe_path(path)
+
+    if not target.is_file():
+        return f"PATCH FAILED: file does not exist: {path}"
 
     with target.open(
         "a",
@@ -162,7 +223,7 @@ def append_text(path: str, content: str) -> str:
 def snapshot_workspace():
     temp = Path(
         tempfile.mkdtemp(
-            prefix="mmserim-agent-snapshot-"
+            prefix="quantrophic-agent-snapshot-"
         )
     )
 
@@ -242,7 +303,9 @@ def _run_git(args, timeout=10):
 
 
 def git_status() -> str:
-    result = _run_git(["status", "--short"])
+    # Scoped to the workspace: it is a subtree of the parent repo, so an
+    # unscoped status would also report unrelated changes under agent/.
+    result = _run_git(["status", "--short", "--", "."])
 
     if result is None:
         return "GIT ERROR: git is not available or timed out."
@@ -254,9 +317,10 @@ def git_status() -> str:
 
 
 def git_commit(message: str) -> str:
-    _run_git(["add", "."])
+    _run_git(["add", "--", "."])
 
-    result = _run_git(["commit", "-m", message])
+    # Commit only workspace paths, even if something else is staged.
+    result = _run_git(["commit", "-m", message, "--", "."])
 
     if result is None:
         return "GIT ERROR: git is not available or timed out."

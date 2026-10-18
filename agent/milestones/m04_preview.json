@@ -1,0 +1,43 @@
+{
+  "title": "Milestone 4 — Preview panel",
+  "goal": "Preview panel next to the editor.",
+  "requirements": [
+    ".preview-panel",
+    ".preview-header",
+    ".preview-controls",
+    ".preview-content"
+  ],
+  "preserve": [
+    "File Explorer",
+    "Code Editor",
+    "tabs",
+    "counter",
+    "status"
+  ],
+  "checks": [
+    {
+      "id": "preview",
+      "type": "visible",
+      "selector": ".preview-panel",
+      "label": "Preview panel visible"
+    },
+    {
+      "id": "preview-header",
+      "type": "visible",
+      "selector": ".preview-header",
+      "label": "Preview header visible"
+    },
+    {
+      "id": "preview-controls",
+      "type": "visible",
+      "selector": ".preview-controls",
+      "label": "Preview controls visible"
+    },
+    {
+      "id": "preview-content",
+      "type": "visible",
+      "selector": ".preview-content",
+      "label": "Preview content visible"
+    }
+  ]
+}

@@ -1,7 +1,9 @@
+"""Manual smoke test: can the local Ollama model call a tool? (needs `ollama serve`)"""
+
 from pathlib import Path
 from ollama import chat
 
-WORKSPACE = Path.home() / "MMSerimAgentLab" / "workspace"
+WORKSPACE = Path(__file__).resolve().parents[2] / "workspace"
 
 
 def list_files() -> str:
@@ -26,7 +28,7 @@ messages = [
 ]
 
 response = chat(
-    model="qwen3:4b",
+    model="qwen3:8b",
     messages=messages,
     tools=[list_files],
 )

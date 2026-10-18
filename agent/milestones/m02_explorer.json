@@ -1,0 +1,50 @@
+{
+  "title": "Milestone 2 — File Explorer",
+  "goal": "File explorer with selectable files.",
+  "requirements": [
+    ".file-explorer",
+    "data-file items",
+    "selected class on click"
+  ],
+  "preserve": [
+    "layout",
+    "counter",
+    "status"
+  ],
+  "checks": [
+    {
+      "id": "explorer",
+      "type": "text_any",
+      "selector": ".file-explorer",
+      "any": [
+        "File Explorer"
+      ],
+      "label": "File Explorer visible"
+    },
+    {
+      "id": "file-index",
+      "type": "visible",
+      "selector": "[data-file=\"index.html\"]",
+      "label": "index.html entry exists"
+    },
+    {
+      "id": "file-style",
+      "type": "visible",
+      "selector": "[data-file=\"style.css\"]",
+      "label": "style.css entry exists"
+    },
+    {
+      "id": "file-script",
+      "type": "visible",
+      "selector": "[data-file=\"script.js\"]",
+      "label": "script.js entry exists"
+    },
+    {
+      "id": "explorer-select",
+      "type": "click_class",
+      "click": ".file-item[data-file=\"script.js\"]",
+      "class": "selected",
+      "label": "Explorer selection works"
+    }
+  ]
+}
